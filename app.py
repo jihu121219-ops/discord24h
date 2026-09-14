@@ -3,7 +3,6 @@ import subprocess
 import os
 import threading
 import queue
-import json
 import sys
 
 app = Flask(__name__)
@@ -39,6 +38,24 @@ def create_file():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
+# --- [추가] 내 컴퓨터에서 파일 업로드 처리 API ---
+@app.route('/upload_file', methods=['POST'])
+def upload_file():
+    if 'files' not in request.files:
+        return jsonify({"status": "error", "message": "업로드된 파일이 없습니다."})
+    
+    files = request.files.getlist('files')
+    uploaded_count = 0
+    try:
+        for file in files:
+            if file and file.filename:
+                filename = file.filename # 한글 이름 지원을 위해 원본 이름 사용
+                file.save(os.path.join('.', filename))
+                uploaded_count += 1
+        return jsonify({"status": "success", "message": f"{uploaded_count}개의 파일이 성공적으로 업로드되었습니다."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 @app.route('/read_file', methods=['GET'])
 def read_file():
     filename = request.args.get('filename', '')
@@ -65,7 +82,6 @@ def save_file():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
-# --- [추가] 라이브러리 관리 API ---
 @app.route('/get_libraries', methods=['GET'])
 def get_libraries():
     libs = []
@@ -112,7 +128,6 @@ def read_output(process, bot_name):
             if bot_name in bot_logs:
                 bot_logs[bot_name].put(log_line)
 
-# --- 봇 실행 시 자동으로 requirements.txt 설치 후 .py 실행 ---
 @app.route('/start_bot', methods=['POST'])
 def start_bot():
     data = request.json
@@ -136,12 +151,11 @@ def start_bot():
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
 
-        # 1. requirements.txt가 있으면 실행 전 자동 설치
         if os.path.exists("requirements.txt"):
             bot_logs[filename].put("[*] 설정된 라이브러리를 설치하는 중...")
             try:
                 install_proc = subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "--user", "-r", "requirements.txt"],
+                    [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', env=env
                 )
                 for line in install_proc.stdout.splitlines():
@@ -150,7 +164,6 @@ def start_bot():
             except Exception as e:
                 bot_logs[filename].put(f"[-] 라이브러리 자동 설치 중 오류 발생: {e}")
 
-        # 2. 선택한 py 파일 실행
         process = subprocess.Popen(
             [sys.executable, '-u', filename],
             stdout=subprocess.PIPE,
@@ -185,8 +198,9 @@ def run_command():
     cmd = data.get('command', '').strip()
     if not cmd:
         return jsonify({"status": "error", "message": "명령어가 비어있습니다."})
-    if cmd.startswith("pip install") and "--user" not in cmd:
-        cmd = cmd.replace("pip install", "pip install --user")
+    
+    if "--user" in cmd:
+        cmd = cmd.replace(" --user", "").replace("--user", "")
 
     def run_cmd_thread():
         cmd_key = "terminal_console"
