@@ -2,10 +2,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>디스코드 봇 & 설정 파일 제어 패널</title>
+    <title>구동패널</title>
     <style>
         body { font-family: '맑은 고딕', sans-serif; background-color: #1e1e1e; color: #fff; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: #2d2d2d; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .container { max-width: 900px; margin: 0 auto; background: #2d2d2d; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px; }
         select { padding: 8px; width: 300px; background: #1e1e1e; color: #fff; border: 1px solid #444; margin-bottom: 15px; }
         button { padding: 10px 15px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; margin-bottom: 10px; }
         .btn-start { background: #4CAF50; color: white; }
@@ -14,6 +14,14 @@
         .btn-create { background: #FF9800; color: white; }
         .btn-edit { background: #9C27B0; color: white; }
         .btn-cmd { background: #607D8B; color: white; }
+        
+        /* 라이브러리 관리 스타일 */
+        .lib-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .lib-input { flex: 2; padding: 10px; background: #181818; color: #fff; border: 1px solid #444; border-radius: 4px; font-family: Consolas, monospace; }
+        .lib-version { flex: 1; padding: 10px; background: #181818; color: #fff; border: 1px solid #444; border-radius: 4px; font-family: Consolas, monospace; }
+        .btn-del { background: #b71c1c; color: white; padding: 10px 14px; border-radius: 4px; cursor: pointer; border: none; }
+        .lib-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
+
         #logBox { margin-top: 15px; padding: 10px; background: #000; border: 1px solid #444; height: 250px; overflow-y: auto; font-family: Consolas, monospace; font-size: 12px; color: #4af626; }
         .cmd-box { display: flex; margin-top: 10px; gap: 5px; }
         .cmd-input { flex: 1; padding: 8px; background: #1e1e1e; color: #fff; border: 1px solid #444; font-family: Consolas, monospace; }
@@ -28,10 +36,21 @@
 </head>
 <body>
     <div class="container">
-        <h2>📂 파일 관리 & 봇 제어 패널</h2>
-        <p>파일을 추가하거나 드롭다운을 <strong>더블클릭</strong>하여 코드를 수정(`Ctrl + S`로 저장)하세요.</p>
+        <h2>📦 라이브러리 관리 (requirements.txt 자동 연동)</h2>
+        <p>필요한 라이브러리와 버전(선택사항)을 입력하세요. 봇을 실행할 때 자동으로 설치된 뒤 봇이 켜집니다.</p>
         
-        <label>서버 파일 목록 (.py, .txt 등):</label><br>
+        <div id="libContainer">
+            <!-- 동적으로 라이브러리 입력 칸 생성 -->
+        </div>
+
+        <div class="lib-actions">
+            <button class="btn-create" onclick="addLibraryRow()">+ 라이브러리 추가</button>
+            <button class="btn-start" onclick="saveLibraries()">💾 라이브러리 저장</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📂 파일 관리 & 봇 제어 패널</h2>
         <select id="fileSelect" size="6" style="width: 100%; height: 120px;" ondblclick="openEditorSelected()">
             <option value="">파일 목록 불러오는 중...</option>
         </select><br>
@@ -43,10 +62,9 @@
         <button class="btn-start" onclick="startBot()">선택한 봇 실행하기 (.py)</button>
         <button class="btn-stop" onclick="stopBot()">봇 중지하기</button>
         
-        <h3>📡 실시간 콘솔 로그 & 직접 명령어 실행</h3>
-        <div id="logBox">대기 중... (명령어나 봇을 실행해 보세요)</div>
+        <h3>📡 실시간 콘솔 로그</h3>
+        <div id="logBox">대기 중...</div>
         
-        <!-- 콘솔 직접 명령어 입력창 -->
         <div class="cmd-box">
             <input type="text" id="cmdInput" class="cmd-input" placeholder="명령어 입력 (예: pip install -U discord.py-self)" onkeypress="if(event.key === 'Enter') sendCommand()">
             <button class="btn-cmd" onclick="sendCommand()">명령어 전송</button>
@@ -78,7 +96,7 @@
                 const result = await response.json();
                 select.innerHTML = '';
                 if(result.files.length === 0) {
-                    select.innerHTML = '<option value="">생성된 파일이 없습니다. [+ 새 파일 추가]를 눌러주세요.</option>';
+                    select.innerHTML = '<option value="">생성된 파일이 없습니다.</option>';
                     return;
                 }
                 result.files.forEach(file => {
@@ -92,10 +110,61 @@
             }
         }
 
+        // --- 라이브러리 UI 관리 함수들 ---
+        async function loadLibraries() {
+            try {
+                const response = await fetch('/get_libraries');
+                const result = await response.json();
+                const container = document.getElementById('libContainer');
+                container.innerHTML = '';
+                if(result.libraries.length === 0) {
+                    addLibraryRow("discord.py-self", "");
+                } else {
+                    result.libraries.forEach(lib => {
+                        addLibraryRow(lib.name, lib.version);
+                    });
+                }
+            } catch (e) {
+                console.error("라이브러리 로드 실패", e);
+            }
+        }
+
+        function addLibraryRow(name = "", version = "") {
+            const container = document.getElementById('libContainer');
+            const row = document.createElement('div');
+            row.className = 'lib-row';
+            row.innerHTML = `
+                <input type="text" class="lib-input" placeholder="라이브러리 이름 (예: discord.py-self)" value="${name}">
+                <input type="text" class="lib-version" placeholder="버전 (예: 2.3.1 - 생략가능)" value="${version}">
+                <button class="btn-del" onclick="this.parentElement.remove()">🗑️</button>
+            `;
+            container.appendChild(row);
+        }
+
+        async function saveLibraries() {
+            const rows = document.querySelectorAll('.lib-row');
+            const libraries = [];
+            rows.forEach(row => {
+                const name = row.querySelector('.lib-input').value.trim();
+                const version = row.querySelector('.lib-version').value.trim();
+                if(name) {
+                    libraries.push({ name: name, version: version });
+                }
+            });
+
+            const response = await fetch('/save_libraries', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ libraries: libraries })
+            });
+            const result = await response.json();
+            alert(result.message);
+        }
+        // ---------------------------------
+
         async function createNewFile() {
             const filename = prompt("생성할 파일 이름을 입력하세요 (예: config.txt, bot.py):");
             if(!filename) return;
-
             const response = await fetch('/create_file', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -103,51 +172,37 @@
             });
             const result = await response.json();
             alert(result.message);
-            if(result.status === "success") {
-                loadFiles();
-            }
+            if(result.status === "success") loadFiles();
         }
 
         async function openEditorSelected() {
             const filename = document.getElementById('fileSelect').value;
-            if(!filename) {
-                alert("수정할 파일을 선택해주세요!");
-                return;
-            }
+            if(!filename) { alert("수정할 파일을 선택해주세요!"); return; }
             currentEditingFile = filename;
             document.getElementById('modalTitle').textContent = `파일 편집 중: ${filename}`;
-            
             const response = await fetch(`/read_file?filename=${filename}`);
             const result = await response.json();
             if(result.status === "success") {
                 document.getElementById('codeTextArea').value = result.content;
                 document.getElementById('editorModal').style.display = 'flex';
                 document.getElementById('codeTextArea').focus();
-            } else {
-                alert(result.message);
-            }
+            } else { alert(result.message); }
         }
 
-        function closeEditor() {
-            document.getElementById('editorModal').style.display = 'none';
-        }
+        function closeEditor() { document.getElementById('editorModal').style.display = 'none'; }
 
         async function saveFileContent() {
             if(!currentEditingFile) return;
             const content = document.getElementById('codeTextArea').value;
-            
             const response = await fetch('/save_file', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: currentEditingFile, content: content })
             });
             const result = await response.json();
-            
             const statusSpan = document.getElementById('saveStatus');
             statusSpan.textContent = result.message;
-            setTimeout(() => {
-                statusSpan.textContent = "💡 단축키: Ctrl + S를 누르면 즉시 저장됩니다.";
-            }, 3000);
+            setTimeout(() => { statusSpan.textContent = "💡 단축키: Ctrl + S를 누르면 즉시 저장됩니다."; }, 3000);
         }
 
         document.addEventListener('keydown', function(e) {
@@ -161,11 +216,7 @@
 
         async function startBot() {
             const filename = document.getElementById('fileSelect').value;
-            if(!filename) {
-                alert("실행할 파일을 선택해주세요!");
-                return;
-            }
-            
+            if(!filename) { alert("실행할 파일을 선택해주세요!"); return; }
             const logBox = document.getElementById('logBox');
             logBox.innerHTML = `[!] '${filename}' 실행 요청 중...<br>`;
             
@@ -174,12 +225,10 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: filename })
             });
-            
             const result = await response.json();
             logBox.innerHTML += result.message + "<br>";
 
             if (eventSource) eventSource.close();
-
             eventSource = new EventSource(`/stream_logs/${filename}`);
             eventSource.onmessage = function(event) {
                 logBox.innerHTML += event.data + "<br>";
@@ -190,38 +239,29 @@
         async function stopBot() {
             const filename = document.getElementById('fileSelect').value;
             if(!filename) return;
-            
             const response = await fetch('/stop_bot', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: filename })
             });
-            
             const result = await response.json();
             document.getElementById('logBox').innerHTML += `<br>${result.message}<br>`;
-            
             if (eventSource) eventSource.close();
         }
 
-        // 콘솔 직접 명령어 전송 함수
         async function sendCommand() {
             const input = document.getElementById('cmdInput');
             const cmd = input.value.trim();
             if(!cmd) return;
-
             const logBox = document.getElementById('logBox');
             logBox.innerHTML += `<br>$ ${cmd}<br>`;
-
             const response = await fetch('/run_command', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ command: cmd })
             });
-            
             input.value = '';
-
             if (eventSource) eventSource.close();
-
             eventSource = new EventSource(`/stream_logs/terminal_console`);
             eventSource.onmessage = function(event) {
                 logBox.innerHTML += event.data + "<br>";
@@ -229,7 +269,10 @@
             };
         }
 
-        window.onload = loadFiles;
+        window.onload = function() {
+            loadFiles();
+            loadLibraries();
+        };
     </script>
 </body>
 </html>
