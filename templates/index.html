@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>구동패널</title>
+    <title>디스코드 봇 & 라이브러리 관리 패널</title>
     <style>
         body { font-family: '맑은 고딕', sans-serif; background-color: #1e1e1e; color: #fff; padding: 20px; }
         .container { max-width: 900px; margin: 0 auto; background: #2d2d2d; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px; }
@@ -12,10 +12,10 @@
         .btn-stop { background: #F44336; color: white; }
         .btn-refresh { background: #2196F3; color: white; }
         .btn-create { background: #FF9800; color: white; }
+        .btn-upload { background: #009688; color: white; }
         .btn-edit { background: #9C27B0; color: white; }
         .btn-cmd { background: #607D8B; color: white; }
         
-        /* 라이브러리 관리 스타일 */
         .lib-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
         .lib-input { flex: 2; padding: 10px; background: #181818; color: #fff; border: 1px solid #444; border-radius: 4px; font-family: Consolas, monospace; }
         .lib-version { flex: 1; padding: 10px; background: #181818; color: #fff; border: 1px solid #444; border-radius: 4px; font-family: Consolas, monospace; }
@@ -37,12 +37,7 @@
 <body>
     <div class="container">
         <h2>📦 라이브러리 관리 (requirements.txt 자동 연동)</h2>
-        <p>필요한 라이브러리와 버전(선택사항)을 입력하세요. 봇을 실행할 때 자동으로 설치된 뒤 봇이 켜집니다.</p>
-        
-        <div id="libContainer">
-            <!-- 동적으로 라이브러리 입력 칸 생성 -->
-        </div>
-
+        <div id="libContainer"></div>
         <div class="lib-actions">
             <button class="btn-create" onclick="addLibraryRow()">+ 라이브러리 추가</button>
             <button class="btn-start" onclick="saveLibraries()">💾 라이브러리 저장</button>
@@ -57,6 +52,9 @@
         
         <button class="btn-refresh" onclick="loadFiles()">새로고침</button>
         <button class="btn-create" onclick="createNewFile()">+ 새 파일 추가</button>
+        <!-- 숨겨진 파일 선택 인풋 및 파일 가져오기 버튼 -->
+        <input type="file" id="fileInput" style="display: none;" multiple accept=".py,.txt" onchange="uploadFiles(this)">
+        <button class="btn-upload" onclick="document.getElementById('fileInput').click()">📁 파일 가져오기</button>
         <button class="btn-edit" onclick="openEditorSelected()">✏️ 코드 수정 (편집)</button><br><br>
         
         <button class="btn-start" onclick="startBot()">선택한 봇 실행하기 (.py)</button>
@@ -66,7 +64,7 @@
         <div id="logBox">대기 중...</div>
         
         <div class="cmd-box">
-            <input type="text" id="cmdInput" class="cmd-input" placeholder="명령어 입력 (예: pip install -U discord.py-self)" onkeypress="if(event.key === 'Enter') sendCommand()">
+            <input type="text" id="cmdInput" class="cmd-input" placeholder="명령어 입력 (예: pip install discord.py)" onkeypress="if(event.key === 'Enter') sendCommand()">
             <button class="btn-cmd" onclick="sendCommand()">명령어 전송</button>
         </div>
     </div>
@@ -110,7 +108,28 @@
             }
         }
 
-        // --- 라이브러리 UI 관리 함수들 ---
+        // --- 파일 업로드 함수 ---
+        async function uploadFiles(input) {
+            const files = input.files;
+            if (files.length === 0) return;
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+
+            const response = await fetch('/upload_file', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            alert(result.message);
+            if (result.status === "success") {
+                loadFiles();
+            }
+            input.value = ''; // 초기화
+        }
+
         async function loadLibraries() {
             try {
                 const response = await fetch('/get_libraries');
@@ -118,7 +137,7 @@
                 const container = document.getElementById('libContainer');
                 container.innerHTML = '';
                 if(result.libraries.length === 0) {
-                    addLibraryRow("discord.py-self", "");
+                    addLibraryRow("discord.py", "");
                 } else {
                     result.libraries.forEach(lib => {
                         addLibraryRow(lib.name, lib.version);
@@ -134,7 +153,7 @@
             const row = document.createElement('div');
             row.className = 'lib-row';
             row.innerHTML = `
-                <input type="text" class="lib-input" placeholder="라이브러리 이름 (예: discord.py-self)" value="${name}">
+                <input type="text" class="lib-input" placeholder="라이브러리 이름 (예: discord.py)" value="${name}">
                 <input type="text" class="lib-version" placeholder="버전 (예: 2.3.1 - 생략가능)" value="${version}">
                 <button class="btn-del" onclick="this.parentElement.remove()">🗑️</button>
             `;
@@ -160,7 +179,6 @@
             const result = await response.json();
             alert(result.message);
         }
-        // ---------------------------------
 
         async function createNewFile() {
             const filename = prompt("생성할 파일 이름을 입력하세요 (예: config.txt, bot.py):");
