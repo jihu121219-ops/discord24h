@@ -13,9 +13,11 @@
         .btn-refresh { background: #2196F3; color: white; }
         .btn-create { background: #FF9800; color: white; }
         .btn-edit { background: #9C27B0; color: white; }
+        .btn-cmd { background: #607D8B; color: white; }
         #logBox { margin-top: 15px; padding: 10px; background: #000; border: 1px solid #444; height: 250px; overflow-y: auto; font-family: Consolas, monospace; font-size: 12px; color: #4af626; }
+        .cmd-box { display: flex; margin-top: 10px; gap: 5px; }
+        .cmd-input { flex: 1; padding: 8px; background: #1e1e1e; color: #fff; border: 1px solid #444; font-family: Consolas, monospace; }
         
-        /* 모달 에디터 창 스타일 */
         #editorModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: #252526; width: 800px; height: 600px; padding: 20px; border-radius: 6px; display: flex; flex-direction: column; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -41,11 +43,16 @@
         <button class="btn-start" onclick="startBot()">선택한 봇 실행하기 (.py)</button>
         <button class="btn-stop" onclick="stopBot()">봇 중지하기</button>
         
-        <h3>📡 실시간 콘솔 로그</h3>
-        <div id="logBox">대기 중...</div>
+        <h3>📡 실시간 콘솔 로그 & 직접 명령어 실행</h3>
+        <div id="logBox">대기 중... (명령어나 봇을 실행해 보세요)</div>
+        
+        <!-- 콘솔 직접 명령어 입력창 -->
+        <div class="cmd-box">
+            <input type="text" id="cmdInput" class="cmd-input" placeholder="명령어 입력 (예: pip install -U discord.py-self)" onkeypress="if(event.key === 'Enter') sendCommand()">
+            <button class="btn-cmd" onclick="sendCommand()">명령어 전송</button>
+        </div>
     </div>
 
-    <!-- 코드 편집기 모달 창 -->
     <div id="editorModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -110,7 +117,6 @@
             currentEditingFile = filename;
             document.getElementById('modalTitle').textContent = `파일 편집 중: ${filename}`;
             
-            // 파일 내용 불러오기
             const response = await fetch(`/read_file?filename=${filename}`);
             const result = await response.json();
             if(result.status === "success") {
@@ -144,11 +150,10 @@
             }, 3000);
         }
 
-        // Ctrl + S 단축키 가로채기 및 저장 처리
         document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 if(document.getElementById('editorModal').style.display === 'flex') {
-                    e.preventDefault(); // 브라우저 기본 저장 창 막기
+                    e.preventDefault();
                     saveFileContent();
                 }
             }
@@ -173,9 +178,7 @@
             const result = await response.json();
             logBox.innerHTML += result.message + "<br>";
 
-            if (eventSource) {
-                eventSource.close();
-            }
+            if (eventSource) eventSource.close();
 
             eventSource = new EventSource(`/stream_logs/${filename}`);
             eventSource.onmessage = function(event) {
@@ -197,9 +200,33 @@
             const result = await response.json();
             document.getElementById('logBox').innerHTML += `<br>${result.message}<br>`;
             
-            if (eventSource) {
-                eventSource.close();
-            }
+            if (eventSource) eventSource.close();
+        }
+
+        // 콘솔 직접 명령어 전송 함수
+        async function sendCommand() {
+            const input = document.getElementById('cmdInput');
+            const cmd = input.value.trim();
+            if(!cmd) return;
+
+            const logBox = document.getElementById('logBox');
+            logBox.innerHTML += `<br>$ ${cmd}<br>`;
+
+            const response = await fetch('/run_command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: cmd })
+            });
+            
+            input.value = '';
+
+            if (eventSource) eventSource.close();
+
+            eventSource = new EventSource(`/stream_logs/terminal_console`);
+            eventSource.onmessage = function(event) {
+                logBox.innerHTML += event.data + "<br>";
+                logBox.scrollTop = logBox.scrollHeight;
+            };
         }
 
         window.onload = loadFiles;
