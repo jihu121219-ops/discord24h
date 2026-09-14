@@ -13,18 +13,15 @@ bot_logs = {}
 def index():
     return render_template('index.html')
 
-# 서버 폴더 내의 모든 파일 목록 불러오기 (.py, .txt 등 전체)
 @app.route('/get_files', methods=['GET'])
 def get_files():
     try:
-        # 시스템 폴더나 app.py 등을 제외한 관리 대상 파일들 반환
         ignore_list = ['.cache', '.local', 'app.py']
         files = [f for f in os.listdir('.') if f not in ignore_list and not f.startswith('.')]
         return jsonify({"status": "success", "files": files})
     except Exception as e:
         return jsonify({"status": "error", "files": [], "message": str(e)})
 
-# 새 파일 생성
 @app.route('/create_file', methods=['POST'])
 def create_file():
     data = request.json
@@ -38,12 +35,11 @@ def create_file():
         
     try:
         with open(filename, "w", encoding="utf-8") as f:
-            f.write("") # 빈 파일 생성
+            f.write("")
         return jsonify({"status": "success", "message": f"'{filename}' 파일이 생성되었습니다."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
-# 파일 내용 읽기 (편집창용)
 @app.route('/read_file', methods=['GET'])
 def read_file():
     filename = request.args.get('filename', '')
@@ -57,7 +53,6 @@ def read_file():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
-# 파일 내용 저장 (Ctrl + S 대응)
 @app.route('/save_file', methods=['POST'])
 def save_file():
     data = request.json
@@ -84,7 +79,6 @@ def read_output(process, bot_name):
             if bot_name in bot_logs:
                 bot_logs[bot_name].put(log_line)
 
-# 파이썬 스크립트 실행 (봇 / 셀프봇)
 @app.route('/start_bot', methods=['POST'])
 def start_bot():
     data = request.json
@@ -138,19 +132,55 @@ def stop_bot():
             return jsonify({"status": "error", "message": str(e)})
     return jsonify({"status": "error", "message": "실행 중인 프로세스가 없습니다."})
 
-@app.route('/stream_logs/<filename>')
-def stream_logs(filename):
+# [추가] 콘솔창에서 직접 명령어를 입력받아 실행하는 API
+@app.route('/run_command', methods=['POST'])
+def run_command():
+    data = request.json
+    cmd = data.get('command', '').strip()
+    if not cmd:
+        return jsonify({"status": "error", "message": "명령어가 비어있습니다."})
+    
+    def run_cmd_thread():
+        cmd_key = "terminal_console"
+        if cmd_key not in bot_logs:
+            bot_logs[cmd_key] = queue.Queue()
+        
+        bot_logs[cmd_key].put(f"$ {cmd}")
+        try:
+            env = os.environ.copy()
+            env["PYTHONIOENCODING"] = "utf-8"
+            
+            process = subprocess.Popen(
+                cmd, shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding='utf-8',
+                env=env
+            )
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    bot_logs[cmd_key].put(output.strip())
+        except Exception as e:
+            bot_logs[cmd_key].put(f"[-] 명령어 실행 오류: {str(e)}")
+
+    threading.Thread(target=run_cmd_thread, daemon=True).start()
+    return jsonify({"status": "success", "message": "명령어 실행 시작..."})
+
+@app.route('/stream_logs/<target_key>')
+def stream_logs(target_key):
     def generate():
-        if filename not in bot_logs:
-            yield "data: 로그가 없습니다. 실행 버튼을 눌러주세요.\n\n"
+        if target_key not in bot_logs:
+            yield "data: 로그가 없습니다.\n\n"
             return
         while True:
             try:
-                line = bot_logs[filename].get(timeout=1)
+                line = bot_logs[target_key].get(timeout=1)
                 yield f"data: {line}\n\n"
             except queue.Empty:
-                if filename not in running_bots:
-                    break
                 continue
     return Response(generate(), mimetype='text/event-stream')
 
