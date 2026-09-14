@@ -3,21 +3,13 @@ import subprocess
 import os
 import threading
 import queue
+import json
 import sys
 
 app = Flask(__name__)
 
 running_bots = {}
 bot_logs = {}
-
-# 서버 시작 시 자동으로 requirements.txt가 있으면 패키지 설치 확인
-def check_and_install_requirements():
-    if os.path.exists("requirements.txt"):
-        try:
-            print("[*] requirements.txt 발견! 필요한 모듈을 확인하고 설치합니다...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "-r", "requirements.txt"])
-        except Exception as e:
-            print(f"[-] 자동 모듈 설치 실패: {e}")
 
 @app.route('/')
 def index():
@@ -36,13 +28,10 @@ def get_files():
 def create_file():
     data = request.json
     filename = data.get('filename', '').strip()
-    
     if not filename:
         return jsonify({"status": "error", "message": "파일 이름을 입력해주세요."})
-        
     if os.path.exists(filename):
         return jsonify({"status": "error", "message": "이미 존재하는 파일 이름입니다."})
-        
     try:
         with open(filename, "w", encoding="utf-8") as f:
             f.write("")
@@ -55,7 +44,6 @@ def read_file():
     filename = request.args.get('filename', '')
     if not filename or not os.path.exists(filename):
         return jsonify({"status": "error", "message": "파일을 찾을 수 없습니다."})
-    
     try:
         with open(filename, "r", encoding="utf-8") as f:
             content = f.read()
@@ -68,14 +56,49 @@ def save_file():
     data = request.json
     filename = data.get('filename', '')
     content = data.get('content', '')
-    
     if not filename:
         return jsonify({"status": "error", "message": "파일 이름이 없습니다."})
-        
     try:
         with open(filename, "w", encoding="utf-8") as f:
             f.write(content)
         return jsonify({"status": "success", "message": f"'{filename}' 저장 완료!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+# --- [추가] 라이브러리 관리 API ---
+@app.route('/get_libraries', methods=['GET'])
+def get_libraries():
+    libs = []
+    if os.path.exists("requirements.txt"):
+        with open("requirements.txt", "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "==" in line:
+                    name, ver = line.split("==", 1)
+                    libs.append({"name": name.strip(), "version": ver.strip()})
+                else:
+                    libs.append({"name": line, "version": ""})
+    return jsonify({"status": "success", "libraries": libs})
+
+@app.route('/save_libraries', methods=['POST'])
+def save_libraries():
+    data = request.json
+    libs = data.get('libraries', [])
+    try:
+        lines = []
+        for lib in libs:
+            name = lib.get('name', '').strip()
+            ver = lib.get('version', '').strip()
+            if name:
+                if ver:
+                    lines.append(f"{name}=={ver}")
+                else:
+                    lines.append(name)
+        with open("requirements.txt", "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        return jsonify({"status": "success", "message": "라이브러리 목록이 저장되었습니다."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
@@ -89,6 +112,7 @@ def read_output(process, bot_name):
             if bot_name in bot_logs:
                 bot_logs[bot_name].put(log_line)
 
+# --- 봇 실행 시 자동으로 requirements.txt 설치 후 .py 실행 ---
 @app.route('/start_bot', methods=['POST'])
 def start_bot():
     data = request.json
@@ -96,7 +120,6 @@ def start_bot():
     
     if not filename.endswith('.py'):
         return jsonify({"status": "error", "message": "실행은 .py 확장자 파일만 가능합니다."})
-        
     if not os.path.exists(filename):
         return jsonify({"status": "error", "message": "존재하지 않는 파일입니다."})
         
@@ -106,11 +129,28 @@ def start_bot():
         except:
             pass
 
-    try:
+    def run_with_install():
+        if filename not in bot_logs:
+            bot_logs[filename] = queue.Queue()
+        
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
-        
-        # 파이썬이 사용자 홈 디렉토리나 로컬 설치 모듈을 인식하도록 경로 강제 추가 (--user 연동)
+
+        # 1. requirements.txt가 있으면 실행 전 자동 설치
+        if os.path.exists("requirements.txt"):
+            bot_logs[filename].put("[*] 설정된 라이브러리를 설치하는 중...")
+            try:
+                install_proc = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "--user", "-r", "requirements.txt"],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', env=env
+                )
+                for line in install_proc.stdout.splitlines():
+                    bot_logs[filename].put(line)
+                bot_logs[filename].put("[+] 라이브러리 설치 완료! 봇을 실행합니다.\n" + "="*40)
+            except Exception as e:
+                bot_logs[filename].put(f"[-] 라이브러리 자동 설치 중 오류 발생: {e}")
+
+        # 2. 선택한 py 파일 실행
         process = subprocess.Popen(
             [sys.executable, '-u', filename],
             stdout=subprocess.PIPE,
@@ -119,21 +159,17 @@ def start_bot():
             encoding='utf-8',
             env=env
         )
-        
         running_bots[filename] = process
-        bot_logs[filename] = queue.Queue()
-        
         threading.Thread(target=read_output, args=(process, filename), daemon=True).start()
-        
-        return jsonify({"status": "success", "message": f"'{filename}' 실행을 시작했습니다!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+
+    threading.Thread(target=run_with_install, daemon=True).start()
+    bot_logs[filename] = queue.Queue()
+    return jsonify({"status": "success", "message": f"'{filename}' 준비 및 실행 시작..."})
 
 @app.route('/stop_bot', methods=['POST'])
 def stop_bot():
     data = request.json
     filename = data.get('filename', '')
-    
     if filename in running_bots:
         try:
             running_bots[filename].terminate()
@@ -149,8 +185,6 @@ def run_command():
     cmd = data.get('command', '').strip()
     if not cmd:
         return jsonify({"status": "error", "message": "명령어가 비어있습니다."})
-    
-    # 만약 pip install 명령어라면 --user 옵션을 강제로 붙여서 초기화를 방지함
     if cmd.startswith("pip install") and "--user" not in cmd:
         cmd = cmd.replace("pip install", "pip install --user")
 
@@ -158,19 +192,12 @@ def run_command():
         cmd_key = "terminal_console"
         if cmd_key not in bot_logs:
             bot_logs[cmd_key] = queue.Queue()
-        
         bot_logs[cmd_key].put(f"$ {cmd}")
         try:
-            env = os.environ.coppy() if hasattr(os, 'coppy') else os.environ.copy()
+            env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8"
-            
             process = subprocess.Popen(
-                cmd, shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='utf-8',
-                env=env
+                cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', env=env
             )
             while True:
                 output = process.stdout.readline()
@@ -199,5 +226,4 @@ def stream_logs(target_key):
     return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
-    check_and_install_requirements()
     app.run(host='0.0.0.0', port=5000, debug=True)
