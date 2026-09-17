@@ -26,8 +26,8 @@ def load_slots_data():
     return {
         "slot_1": {
             "name": "서버관리봇",
-            "packages": "discord.py",
-            "startup_file": "bot.py",
+            "packages": "discord.py-self",
+            "startup_file": "main.py",
             "status": "offline"
         }
     }
@@ -57,7 +57,7 @@ def add_slot():
     slots[new_id] = {
         "name": f"봇 슬롯 {len(slots) + 1}",
         "packages": "",
-        "startup_file": "bot.py",
+        "startup_file": "main.py",
         "status": "offline"
     }
     save_slots_data(slots)
@@ -68,7 +68,25 @@ def save_slots():
     data = request.json
     slots = data.get("slots", {})
     save_slots_data(slots)
-    return jsonify({"status": "success", "message": "저장되었습니다."})
+    
+    # [핵심 추가] 간편 설정 저장 시 requirements.txt 파일 자동 생성/업데이트
+    all_packages = set()
+    for slot_id, slot_info in slots.items():
+        pkgs = slot_info.get("packages", "").strip()
+        if pkgs:
+            for p in pkgs.split():
+                all_packages.add(p)
+                
+    try:
+        with open("requirements.txt", "w", encoding="utf-8") as f:
+            f.write("flask\n")  # 웹 패널 구동 필수
+            for p in all_packages:
+                if p.lower() != "flask":
+                    f.write(f"{p}\n")
+    except Exception as e:
+        print(f"[-] requirements.txt 업데이트 오류: {e}")
+
+    return jsonify({"status": "success", "message": "저장 및 requirements.txt 반영 완료!"})
 
 @app.route('/install_packages', methods=['POST'])
 def install_packages():
@@ -88,7 +106,7 @@ def install_packages():
 
 @app.route('/get_files', methods=['GET'])
 def get_files():
-    ignore_files = ['app.py', 'slots_config.json']
+    ignore_files = ['app.py', 'slots_config.json', 'requirements.txt']
     files = [f for f in os.listdir('.') if os.path.isfile(f) and f not in ignore_files and not f.startswith('.')]
     return jsonify({"files": files})
 
@@ -152,18 +170,17 @@ def start_bot():
     if slot_id in bot_processes and bot_processes[slot_id].poll() is None:
         bot_processes[slot_id].terminate()
 
-    startup_file = slots[slot_id].get("startup_file", "bot.py")
+    startup_file = slots[slot_id].get("startup_file", "main.py")
     if not os.path.exists(startup_file):
         return jsonify({"status": "error", "message": f"실행할 파일({startup_file})이 존재하지 않습니다."})
 
-    # [추가됨] 슬롯에 설정된 패키지 목록 가져오기
     packages = slots[slot_id].get("packages", "").strip()
 
     q = Queue()
     bot_queues[slot_id] = q
 
     def run_bot_pipeline():
-        # 1. 시작 버튼을 누르면 패키지를 먼저 자동으로 설치
+        # 1. 시작 버튼을 누르면 패키지 자동 설치 진행
         if packages:
             q.put(f"[!] 필수 패키지 설치 시도 중: {packages}...\n")
             pkg_list = packages.split()
@@ -180,7 +197,7 @@ def start_bot():
         else:
             q.put("[!] 설치할 패키지가 지정되지 않았습니다.\n")
 
-        # 2. 패키지 설치가 끝나면 파이썬 파일(.py) 실행
+        # 2. 패키지 설치 완료 후 봇 파이썬 파일 실행
         q.put(f"[!] '{startup_file}' 구동 시작...\n")
 
         def enqueue_output(out, queue):
@@ -202,7 +219,6 @@ def start_bot():
         t.daemon = True
         t.start()
 
-    # 백그라운드 스레드에서 패키지 설치 후 봇 실행 진행
     threading.Thread(target=run_bot_pipeline, daemon=True).start()
 
     return jsonify({"status": "success", "message": f"'{startup_file}' 구동 파이프라인이 시작되었습니다."})
@@ -230,7 +246,6 @@ def stream_logs(slot_id):
             except Empty:
                 proc = bot_processes.get(slot_id)
                 if proc and proc.poll() is not None:
-                    # 동일한 종료 프로세스에 대해서는 메시지를 중복 발송하지 않음
                     if bot_exit_notified.get(slot_id) != proc:
                         bot_exit_notified[slot_id] = proc
                         yield f"data: [!] 프로세스가 종료되었습니다.\n\n"
