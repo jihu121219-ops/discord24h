@@ -69,7 +69,7 @@ def save_slots():
     slots = data.get("slots", {})
     save_slots_data(slots)
     
-    # [핵심 추가] 간편 설정 저장 시 requirements.txt 파일 자동 생성/업데이트
+    # 간편 설정 저장 시 requirements.txt 파일 자동 생성/업데이트
     all_packages = set()
     for slot_id, slot_info in slots.items():
         pkgs = slot_info.get("packages", "").strip()
@@ -180,7 +180,7 @@ def start_bot():
     bot_queues[slot_id] = q
 
     def run_bot_pipeline():
-        # 1. 시작 버튼을 누르면 패키지 자동 설치 진행
+        # 1. 패키지 자동 설치
         if packages:
             q.put(f"[!] 필수 패키지 설치 시도 중: {packages}...\n")
             pkg_list = packages.split()
@@ -197,7 +197,7 @@ def start_bot():
         else:
             q.put("[!] 설치할 패키지가 지정되지 않았습니다.\n")
 
-        # 2. 패키지 설치 완료 후 봇 파이썬 파일 실행
+        # 2. 봇 파이썬 파일 실행 (실시간 출력 옵션 -u 적용)
         q.put(f"[!] '{startup_file}' 구동 시작...\n")
 
         def enqueue_output(out, queue):
@@ -205,19 +205,23 @@ def start_bot():
                 queue.put(line.decode('utf-8', errors='ignore'))
             out.close()
 
-        process = subprocess.Popen(
-            [sys.executable, startup_file],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=1,
-            universal_newlines=False
-        )
-        bot_processes[slot_id] = process
-        bot_exit_notified.pop(slot_id, None)
+        try:
+            # [-u 옵션을 추가하여 버퍼링 없이 즉시 로그가 출력되도록 함]
+            process = subprocess.Popen(
+                [sys.executable, "-u", startup_file],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                bufsize=1,
+                universal_newlines=False
+            )
+            bot_processes[slot_id] = process
+            bot_exit_notified.pop(slot_id, None)
 
-        t = threading.Thread(target=enqueue_output, args=(process.stdout, q))
-        t.daemon = True
-        t.start()
+            t = threading.Thread(target=enqueue_output, args=(process.stdout, q))
+            t.daemon = True
+            t.start()
+        except Exception as e:
+            q.put(f"[오류] 프로세스 실행 실패: {str(e)}\n")
 
     threading.Thread(target=run_bot_pipeline, daemon=True).start()
 
@@ -248,7 +252,8 @@ def stream_logs(slot_id):
                 if proc and proc.poll() is not None:
                     if bot_exit_notified.get(slot_id) != proc:
                         bot_exit_notified[slot_id] = proc
-                        yield f"data: [!] 프로세스가 종료되었습니다.\n\n"
+                        exit_code = proc.returncode
+                        yield f"data: [!] 프로세스가 종료되었습니다. (종료 코드: {exit_code})\n\n"
                 continue
     return Response(event_stream(), mimetype="text/event-stream")
 
