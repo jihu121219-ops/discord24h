@@ -12,9 +12,9 @@ app = Flask(__name__)
 CONFIG_FILE = "slots_config.json"
 
 # 전역 슬롯 상태 관리 딕셔너리 및 프로세스 관리
-# 구조: { slot_id: { "name": "...", "packages": "...", "startup_file": "...", "status": "offline" } }
 bot_processes = {}
 bot_queues = {}
+bot_exit_notified = {}  # 프로세스 종료 메시지 중복 출력 방지용 딕셔너리
 
 def load_slots_data():
     if os.path.exists(CONFIG_FILE):
@@ -23,7 +23,6 @@ def load_slots_data():
                 return json.load(f)
             except:
                 pass
-    # 기본 초기 슬롯 설정
     return {
         "slot_1": {
             "name": "서버관리봇",
@@ -44,7 +43,6 @@ def index():
 @app.route('/get_slots', methods=['GET'])
 def get_slots():
     slots = load_slots_data()
-    # 현재 실행 상태 확인 후 동기화
     for slot_id in slots:
         if slot_id in bot_processes and bot_processes[slot_id].poll() is None:
             slots[slot_id]["status"] = "online"
@@ -72,7 +70,6 @@ def save_slots():
     save_slots_data(slots)
     return jsonify({"status": "success", "message": "저장되었습니다."})
 
-# [추가됨] 웹 화면에서 입력한 패키지를 즉시 pip로 설치하는 라우트
 @app.route('/install_packages', methods=['POST'])
 def install_packages():
     data = request.json
@@ -91,7 +88,6 @@ def install_packages():
 
 @app.route('/get_files', methods=['GET'])
 def get_files():
-    # 현재 디렉토리 내의 파일 목록 반환 (특정 확장자 제외 가능)
     ignore_files = ['app.py', 'slots_config.json']
     files = [f for f in os.listdir('.') if os.path.isfile(f) and f not in ignore_files and not f.startswith('.')]
     return jsonify({"files": files})
@@ -153,7 +149,6 @@ def start_bot():
     if slot_id not in slots:
         return jsonify({"status": "error", "message": "존재하지 않는 슬롯입니다."})
     
-    # 이미 실행 중인 경우 중지 후 재시작
     if slot_id in bot_processes and bot_processes[slot_id].poll() is None:
         bot_processes[slot_id].terminate()
 
@@ -169,7 +164,6 @@ def start_bot():
             queue.put(line.decode('utf-8', errors='ignore'))
         out.close()
 
-    # 프로세스 실행
     process = subprocess.Popen(
         [sys.executable, startup_file],
         stdout=subprocess.PIPE,
@@ -206,9 +200,12 @@ def stream_logs(slot_id):
                 line = q.get(timeout=1.0)
                 yield f"data: {line.strip()}\n\n"
             except Empty:
-                if slot_id in bot_processes and bot_processes[slot_id].poll() is not None:
-                    yield f"data: [!] 프로세스가 종료되었습니다.\n\n"
-                    break
+                proc = bot_processes.get(slot_id)
+                if proc and proc.poll() is not None:
+                    # 동일한 종료 프로세스에 대해서는 메시지를 중복 발송하지 않음
+                    if bot_exit_notified.get(slot_id) != proc:
+                        bot_exit_notified[slot_id] = proc
+                        yield f"data: [!] 프로세스가 종료되었습니다.\n\n"
                 continue
     return Response(event_stream(), mimetype="text/event-stream")
 
