@@ -2,209 +2,457 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>디스코드 봇 & 라이브러리 관리 패널</title>
+    <title>디스코드 봇 멀티 슬롯 관리 패널</title>
     <style>
-        body { font-family: '맑은 고딕', sans-serif; background-color: #1e1e1e; color: #fff; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: #2d2d2d; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px; }
-        select { padding: 8px; width: 300px; background: #1e1e1e; color: #fff; border: 1px solid #444; margin-bottom: 15px; }
-        button { padding: 10px 15px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; margin-bottom: 10px; }
-        .btn-start { background: #4CAF50; color: white; }
-        .btn-stop { background: #F44336; color: white; }
-        .btn-refresh { background: #2196F3; color: white; }
-        .btn-create { background: #FF9800; color: white; }
-        .btn-upload { background: #009688; color: white; }
-        .btn-edit { background: #9C27B0; color: white; }
-        .btn-cmd { background: #607D8B; color: white; }
-        
-        .lib-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
-        .lib-input { flex: 2; padding: 10px; background: #181818; color: #fff; border: 1px solid #444; border-radius: 4px; font-family: Consolas, monospace; }
-        .lib-version { flex: 1; padding: 10px; background: #181818; color: #fff; border: 1px solid #444; border-radius: 4px; font-family: Consolas, monospace; }
-        .btn-del { background: #b71c1c; color: white; padding: 10px 14px; border-radius: 4px; cursor: pointer; border: none; }
-        .lib-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --panel-border: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+            --accent-orange: #f59e0b;
+            --accent-purple: #8b5cf6;
+        }
 
-        #logBox { margin-top: 15px; padding: 10px; background: #000; border: 1px solid #444; height: 250px; overflow-y: auto; font-family: Consolas, monospace; font-size: 12px; color: #4af626; }
-        .cmd-box { display: flex; margin-top: 10px; gap: 5px; }
-        .cmd-input { flex: 1; padding: 8px; background: #1e1e1e; color: #fff; border: 1px solid #444; font-family: Consolas, monospace; }
+        body { 
+            font-family: 'Pretendard', '맑은 고딕', sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            margin: 0; padding: 0;
+        }
+
+        /* 상단 네비게이션 탭 바 */
+        .top-nav {
+            background: #090d16;
+            border-bottom: 1px solid var(--panel-border);
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-tabs { display: flex; gap: 5px; overflow-x: auto; }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 15px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { color: var(--text-main); }
+        .tab-btn.active { color: var(--text-main); border-bottom-color: var(--text-main); }
+
+        .slot-selector-container { display: flex; align-items: center; gap: 10px; }
+        .slot-dropdown {
+            background: #1e293b;
+            color: #fff;
+            border: 1px solid var(--panel-border);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+        }
+        .btn-add-slot {
+            background: var(--accent-orange);
+            color: #fff;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .main-content { max-width: 1000px; margin: 25px auto; padding: 0 20px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .container {
+            background: var(--panel-bg);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        h2 { font-size: 1.2rem; margin-top: 0; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; display: flex; align-items: center; gap: 8px; }
         
-        #editorModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: #252526; width: 800px; height: 600px; padding: 20px; border-radius: 6px; display: flex; flex-direction: column; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .modal-header h3 { margin: 0; color: #fff; }
-        textarea.code-editor { flex: 1; background: #1e1e1e; color: #d4d4d4; font-family: Consolas, monospace; font-size: 14px; padding: 10px; border: 1px solid #333; resize: none; line-height: 1.4; outline: none; }
-        .modal-footer { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; color: #888; font-size: 12px; }
+        /* 제어 패널 UI */
+        .status-bar {
+            background: #090d16;
+            border: 1px solid var(--panel-border);
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+        .badge { padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block; }
+        .badge.online { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.4); }
+        .badge.offline { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.4); }
+
+        .control-btns button {
+            padding: 8px 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 13px;
+        }
+        .btn-start-bot { background: var(--accent-green); color: white; }
+        .btn-stop-bot { background: var(--accent-red); color: white; }
+
+        #logBox {
+            background: #05080f;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 15px;
+            height: 320px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 12.5px;
+            color: #34d399;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        /* 파일 관리 UI */
+        .file-toolbar { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        .btn-action { padding: 8px 14px; border-radius: 6px; border: none; font-weight: 600; font-size: 13px; cursor: pointer; color: white; }
+        .btn-upload { background: var(--accent-teal, #14b8a6); }
+        .btn-create { background: var(--accent-orange); }
+        .btn-refresh { background: var(--accent-blue); }
+        
+        .file-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        .file-table th, .file-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--panel-border); }
+        .file-table th { color: var(--text-muted); font-weight: 600; }
+        .file-row:hover { background: rgba(255,255,255,0.02); }
+        .file-actions button { background: transparent; border: none; cursor: pointer; font-size: 14px; margin-right: 8px; }
+
+        /* 간편 설정 및 시작 설정 카드 */
+        .setting-card {
+            background: #090d16;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        .setting-card label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+        .setting-card input, .setting-card select {
+            width: 100%;
+            padding: 10px;
+            background: #1e293b;
+            color: #fff;
+            border: 1px solid var(--panel-border);
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            margin-bottom: 10px;
+        }
+        .setting-card button {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* 에디터 모달 */
+        #editorModal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px);
+            z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: var(--panel-bg); width: 850px; height: 650px; padding: 25px;
+            border-radius: 12px; border: 1px solid var(--panel-border); display: flex; flex-direction: column;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        textarea.code-editor {
+            flex: 1; background: #05080f; color: #e2e8f0; font-family: 'Consolas', monospace;
+            font-size: 13.5px; padding: 15px; border: 1px solid var(--panel-border); border-radius: 8px;
+            resize: none; outline: none; line-height: 1.5;
+        }
+        .modal-footer { margin-top: 15px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>📦 라이브러리 관리 (requirements.txt 자동 연동)</h2>
-        <div id="libContainer"></div>
-        <div class="lib-actions">
-            <button class="btn-create" onclick="addLibraryRow()">+ 라이브러리 추가</button>
-            <button class="btn-start" onclick="saveLibraries()">💾 라이브러리 저장</button>
+
+    <!-- 상단 네비게이션 탭 및 슬롯 선택 바 -->
+    <div class="top-nav">
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('console')">콘솔</button>
+            <button class="tab-btn" onclick="switchTab('quick-setting')">간편 설정</button>
+            <button class="tab-btn" onclick="switchTab('file')">파일</button>
+            <button class="tab-btn" onclick="switchTab('start-setting')">시작 설정</button>
+        </div>
+        <div class="slot-selector-container">
+            <select id="slotSelect" class="slot-dropdown" onchange="changeActiveSlot()"></select>
+            <button class="btn-add-slot" onclick="addNewSlot()">+ 슬롯 추가</button>
         </div>
     </div>
 
-    <div class="container">
-        <h2>📂 파일 관리 & 봇 제어 패널</h2>
-        <select id="fileSelect" size="6" style="width: 100%; height: 120px;" ondblclick="openEditorSelected()">
-            <option value="">파일 목록 불러오는 중...</option>
-        </select><br>
-        
-        <button class="btn-refresh" onclick="loadFiles()">새로고침</button>
-        <button class="btn-create" onclick="createNewFile()">+ 새 파일 추가</button>
-        <!-- 숨겨진 파일 선택 인풋 및 파일 가져오기 버튼 -->
-        <input type="file" id="fileInput" style="display: none;" multiple accept=".py,.txt" onchange="uploadFiles(this)">
-        <button class="btn-upload" onclick="document.getElementById('fileInput').click()">📁 파일 가져오기</button>
-        <button class="btn-edit" onclick="openEditorSelected()">✏️ 코드 수정 (편집)</button><br><br>
-        
-        <button class="btn-start" onclick="startBot()">선택한 봇 실행하기 (.py)</button>
-        <button class="btn-stop" onclick="stopBot()">봇 중지하기</button>
-        
-        <h3>📡 실시간 콘솔 로그</h3>
-        <div id="logBox">대기 중...</div>
-        
-        <div class="cmd-box">
-            <input type="text" id="cmdInput" class="cmd-input" placeholder="명령어 입력 (예: pip install discord.py)" onkeypress="if(event.key === 'Enter') sendCommand()">
-            <button class="btn-cmd" onclick="sendCommand()">명령어 전송</button>
+    <div class="main-content">
+
+        <!-- 1. 콘솔 탭 -->
+        <div id="tab-console" class="tab-content active">
+            <div class="container">
+                <h2>📡 봇 콘솔 및 실시간 로그</h2>
+                <div class="status-bar">
+                    <div>
+                        <span id="slotStatusBadge" class="badge offline">오프라인</span>
+                        <span id="slotNameDisplay" style="margin-left: 10px; font-weight: 600;">선택된 봇</span>
+                    </div>
+                    <div class="control-btns">
+                        <button class="btn-start-bot" onclick="startCurrentBot()">▶ 시작</button>
+                        <button class="btn-stop-bot" onclick="stopCurrentBot()">⏹ 중지</button>
+                    </div>
+                </div>
+                <div id="logBox">봇을 시작하면 이곳에 실시간 로그가 출력됩니다...</div>
+                <button class="btn-action" style="background: #475569;" onclick="document.getElementById('logBox').innerHTML=''">로그 지우기</button>
+            </div>
         </div>
+
+        <!-- 2. 간편 설정 탭 (라이브러리 및 패키지 설정) -->
+        <div id="tab-quick-setting" class="tab-content">
+            <div class="container">
+                <h2>⚙️ 간편 설정 (Python 패키지)</h2>
+                <div class="setting-card">
+                    <label>PYTHON PACKAGES (pip로 설치할 패키지)</label>
+                    <input type="text" id="quickPackagesInput" placeholder="예: discord.py python-dotenv aiohttp">
+                    <button onclick="saveQuickPackages()">설정 저장</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 파일 관리 탭 (추가, 수정, 삭제) -->
+        <div id="tab-file" class="tab-content">
+            <div class="container">
+                <h2>📂 파일 관리 (생성, 수정, 삭제)</h2>
+                <div class="file-toolbar">
+                    <input type="file" id="fileUploadInput" style="display:none;" multiple onchange="uploadFiles(this)">
+                    <button class="btn-action btn-upload" onclick="document.getElementById('fileUploadInput').click()">📁 파일 업로드</button>
+                    <button class="btn-action btn-create" onclick="createNewFile()">+ 새 파일 생성</button>
+                    <button class="btn-action btn-refresh" onclick="loadFilesList()">🔄 새로고침</button>
+                </div>
+                <table class="file-table">
+                    <thead>
+                        <tr>
+                            <th>파일명</th>
+                            <th style="width: 100px; text-align: right;">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fileTableBody">
+                        <tr><td colspan="2" style="text-align:center; color:var(--text-muted);">파일 목록 로딩 중...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 4. 시작 설정 탭 (구동할 메인 파일 지정) -->
+        <div id="tab-start-setting" class="tab-content">
+            <div class="container">
+                <h2>🚀 시작 파일 설정</h2>
+                <div class="setting-card">
+                    <label>STARTUP FILE (시작할 메인 .py 파일)</label>
+                    <select id="startupFileSelect"></select>
+                    <button onclick="saveStartupFileSetting()">저장하기</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
+    <!-- 파일 코드 편집 모달 -->
     <div id="editorModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modalTitle">파일 편집기</h3>
-                <button style="background: #F44336; color: white; padding: 5px 10px;" onclick="closeEditor()">닫기</button>
+                <h3 id="modalTitle" style="margin:0;">코드 편집기</h3>
+                <button class="btn-action" style="background:var(--accent-red);" onclick="closeEditor()">닫기</button>
             </div>
             <textarea id="codeTextArea" class="code-editor" placeholder="코드를 입력하세요..."></textarea>
             <div class="modal-footer">
-                <span id="saveStatus">💡 단축키: Ctrl + S를 누르면 즉시 저장됩니다.</span>
-                <button class="btn-start" onclick="saveFileContent()">저장하기 (Ctrl+S)</button>
+                <span id="saveStatus">💡 Ctrl + S를 누르면 즉시 저장됩니다.</span>
+                <button class="btn-action btn-start-bot" onclick="saveFileContent()" style="margin:0;">저장하기</button>
             </div>
         </div>
     </div>
 
     <script>
+        let slots = {};
+        let currentSlotId = "";
         let eventSource = null;
         let currentEditingFile = "";
 
-        async function loadFiles() {
-            const select = document.getElementById('fileSelect');
-            try {
-                const response = await fetch('/get_files');
-                const result = await response.json();
-                select.innerHTML = '';
-                if(result.files.length === 0) {
-                    select.innerHTML = '<option value="">생성된 파일이 없습니다.</option>';
-                    return;
-                }
-                result.files.forEach(file => {
-                    const opt = document.createElement('option');
-                    opt.value = file;
-                    opt.textContent = file;
-                    select.appendChild(opt);
-                });
-            } catch (e) {
-                select.innerHTML = '<option value="">파일 목록 로드 실패</option>';
-            }
+        // 탭 전환
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            event.target.classList.add('active');
+            if(tabName === 'file') loadFilesList();
+            if(tabName === 'start-setting') loadStartupFileOptions();
         }
 
-        // --- 파일 업로드 함수 ---
-        async function uploadFiles(input) {
-            const files = input.files;
-            if (files.length === 0) return;
-
-            const formData = new FormData();
-            for (let i = 0; i < files.length; i++) {
-                formData.append('files', files[i]);
+        // 슬롯 로드 및 UI 갱신
+        async function fetchSlots() {
+            const res = await fetch('/get_slots');
+            const data = await res.json();
+            slots = data.slots;
+            const slotSelect = document.getElementById('slotSelect');
+            slotSelect.innerHTML = '';
+            
+            const keys = Object.keys(slots);
+            if(keys.length === 0) {
+                addNewSlot();
+                return;
             }
 
-            const response = await fetch('/upload_file', {
+            if(!currentSlotId || !slots[currentSlotId]) {
+                currentSlotId = keys[0];
+            }
+
+            keys.forEach(id => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = slots[id].name;
+                if(id === currentSlotId) opt.selected = true;
+                slotSelect.appendChild(opt);
+            });
+
+            updateSlotUI();
+        }
+
+        function changeActiveSlot() {
+            currentSlotId = document.getElementById('slotSelect').value;
+            updateSlotUI();
+        }
+
+        function updateSlotUI() {
+            const slot = slots[currentSlotId];
+            if(!slot) return;
+            document.getElementById('slotNameDisplay').textContent = slot.name;
+            const badge = document.getElementById('slotStatusBadge');
+            badge.className = `badge ${slot.status}`;
+            badge.textContent = slot.status === 'online' ? '온라인 (실행 중)' : '오프라인';
+            document.getElementById('quickPackagesInput').value = slot.packages || '';
+            
+            // 로그 스트림 재연결
+            if(eventSource) eventSource.close();
+            eventSource = new EventSource(`/stream_logs/${currentSlotId}`);
+            eventSource.onmessage = function(e) {
+                const logBox = document.getElementById('logBox');
+                logBox.innerHTML += e.data + "<br>";
+                logBox.scrollTop = logBox.scrollHeight;
+            };
+        }
+
+        async function addNewSlot() {
+            const res = await fetch('/add_slot', { method: 'POST' });
+            const data = await res.json();
+            slots = data.slots;
+            currentSlotId = Object.keys(slots)[Object.keys(slots).length - 1];
+            fetchSlots();
+        }
+
+        // 간편 설정 저장
+        async function saveQuickPackages() {
+            slots[currentSlotId].packages = document.getElementById('quickPackagesInput').value;
+            await saveSlotsToServer();
+            alert("패키지 설정이 저장되었습니다.");
+        }
+
+        async function saveSlotsToServer() {
+            await fetch('/save_slots', {
                 method: 'POST',
-                body: formData
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ slots: slots })
             });
-            const result = await response.json();
-            alert(result.message);
-            if (result.status === "success") {
-                loadFiles();
+        }
+
+        // 파일 목록 및 관리
+        async function loadFilesList() {
+            const res = await fetch('/get_files');
+            const data = await res.json();
+            const tbody = document.getElementById('fileTableBody');
+            tbody.innerHTML = '';
+            if(data.files.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-muted);">생성된 파일이 없습니다.</td></tr>';
+                return;
             }
-            input.value = ''; // 초기화
-        }
-
-        async function loadLibraries() {
-            try {
-                const response = await fetch('/get_libraries');
-                const result = await response.json();
-                const container = document.getElementById('libContainer');
-                container.innerHTML = '';
-                if(result.libraries.length === 0) {
-                    addLibraryRow("discord.py", "");
-                } else {
-                    result.libraries.forEach(lib => {
-                        addLibraryRow(lib.name, lib.version);
-                    });
-                }
-            } catch (e) {
-                console.error("라이브러리 로드 실패", e);
-            }
-        }
-
-        function addLibraryRow(name = "", version = "") {
-            const container = document.getElementById('libContainer');
-            const row = document.createElement('div');
-            row.className = 'lib-row';
-            row.innerHTML = `
-                <input type="text" class="lib-input" placeholder="라이브러리 이름 (예: discord.py)" value="${name}">
-                <input type="text" class="lib-version" placeholder="버전 (예: 2.3.1 - 생략가능)" value="${version}">
-                <button class="btn-del" onclick="this.parentElement.remove()">🗑️</button>
-            `;
-            container.appendChild(row);
-        }
-
-        async function saveLibraries() {
-            const rows = document.querySelectorAll('.lib-row');
-            const libraries = [];
-            rows.forEach(row => {
-                const name = row.querySelector('.lib-input').value.trim();
-                const version = row.querySelector('.lib-version').value.trim();
-                if(name) {
-                    libraries.push({ name: name, version: version });
-                }
+            data.files.forEach(file => {
+                const tr = document.createElement('tr');
+                tr.className = 'file-row';
+                tr.innerHTML = `
+                    <td>📄 ${file}</td>
+                    <td class="file-actions" style="text-align: right;">
+                        <button onclick="openEditor('${file}')" title="수정">✏️</button>
+                        <button onclick="deleteFile('${file}')" title="삭제">🗑️</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
             });
-
-            const response = await fetch('/save_libraries', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ libraries: libraries })
-            });
-            const result = await response.json();
-            alert(result.message);
         }
 
         async function createNewFile() {
-            const filename = prompt("생성할 파일 이름을 입력하세요 (예: config.txt, bot.py):");
+            const filename = prompt("생성할 파일 이름을 입력하세요 (예: bot.py):");
             if(!filename) return;
-            const response = await fetch('/create_file', {
+            const res = await fetch('/create_file', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: filename })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ filename })
             });
-            const result = await response.json();
+            const result = await res.json();
             alert(result.message);
-            if(result.status === "success") loadFiles();
+            loadFilesList();
         }
 
-        async function openEditorSelected() {
-            const filename = document.getElementById('fileSelect').value;
-            if(!filename) { alert("수정할 파일을 선택해주세요!"); return; }
+        async function deleteFile(filename) {
+            if(!confirm(`정말 '${filename}' 파일을 삭제하시겠습니까?`)) return;
+            const res = await fetch('/delete_file', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ filename })
+            });
+            const result = await res.json();
+            alert(result.message);
+            loadFilesList();
+        }
+
+        async function uploadFiles(input) {
+            const formData = new FormData();
+            for(let file of input.files) formData.append('files', file);
+            const res = await fetch('/upload_file', { method: 'POST', body: formData });
+            const result = await res.json();
+            alert(result.message);
+            loadFilesList();
+        }
+
+        // 파일 편집 모달
+        async function openEditor(filename) {
             currentEditingFile = filename;
-            document.getElementById('modalTitle').textContent = `파일 편집 중: ${filename}`;
-            const response = await fetch(`/read_file?filename=${filename}`);
-            const result = await response.json();
-            if(result.status === "success") {
-                document.getElementById('codeTextArea').value = result.content;
+            document.getElementById('modalTitle').textContent = `코드 편집: ${filename}`;
+            const res = await fetch(`/read_file?filename=${filename}`);
+            const data = await res.json();
+            if(data.status === 'success') {
+                document.getElementById('codeTextArea').value = data.content;
                 document.getElementById('editorModal').style.display = 'flex';
-                document.getElementById('codeTextArea').focus();
-            } else { alert(result.message); }
+            } else {
+                alert(data.message);
+            }
         }
 
         function closeEditor() { document.getElementById('editorModal').style.display = 'none'; }
@@ -212,19 +460,18 @@
         async function saveFileContent() {
             if(!currentEditingFile) return;
             const content = document.getElementById('codeTextArea').value;
-            const response = await fetch('/save_file', {
+            const res = await fetch('/save_file', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: currentEditingFile, content: content })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ filename: currentEditingFile, content })
             });
-            const result = await response.json();
-            const statusSpan = document.getElementById('saveStatus');
-            statusSpan.textContent = result.message;
-            setTimeout(() => { statusSpan.textContent = "💡 단축키: Ctrl + S를 누르면 즉시 저장됩니다."; }, 3000);
+            const data = await res.json();
+            alert(data.message);
         }
 
-        document.addEventListener('keydown', function(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        // 단축키 Ctrl + S 저장 지원
+        document.addEventListener('keydown', e => {
+            if((e.ctrlKey || e.metaKey) && e.key === 's') {
                 if(document.getElementById('editorModal').style.display === 'flex') {
                     e.preventDefault();
                     saveFileContent();
@@ -232,64 +479,58 @@
             }
         });
 
-        async function startBot() {
-            const filename = document.getElementById('fileSelect').value;
-            if(!filename) { alert("실행할 파일을 선택해주세요!"); return; }
-            const logBox = document.getElementById('logBox');
-            logBox.innerHTML = `[!] '${filename}' 실행 요청 중...<br>`;
-            
-            const response = await fetch('/start_bot', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: filename })
+        // 시작 설정
+        async function loadStartupFileOptions() {
+            const res = await fetch('/get_files');
+            const data = await res.json();
+            const select = document.getElementById('startupFileSelect');
+            select.innerHTML = '';
+            data.files.forEach(f => {
+                if(f.endsWith('.py')) {
+                    const opt = document.createElement('option');
+                    opt.value = f;
+                    opt.textContent = f;
+                    if(slots[currentSlotId]?.startup_file === f) opt.selected = true;
+                    select.appendChild(opt);
+                }
             });
-            const result = await response.json();
-            logBox.innerHTML += result.message + "<br>";
-
-            if (eventSource) eventSource.close();
-            eventSource = new EventSource(`/stream_logs/${filename}`);
-            eventSource.onmessage = function(event) {
-                logBox.innerHTML += event.data + "<br>";
-                logBox.scrollTop = logBox.scrollHeight;
-            };
         }
 
-        async function stopBot() {
-            const filename = document.getElementById('fileSelect').value;
-            if(!filename) return;
-            const response = await fetch('/stop_bot', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: filename })
-            });
-            const result = await response.json();
-            document.getElementById('logBox').innerHTML += `<br>${result.message}<br>`;
-            if (eventSource) eventSource.close();
+        async function saveStartupFileSetting() {
+            const filename = document.getElementById('startupFileSelect').value;
+            slots[currentSlotId].startup_file = filename;
+            await saveSlotsToServer();
+            alert("시작 파일 설정이 저장되었습니다.");
         }
 
-        async function sendCommand() {
-            const input = document.getElementById('cmdInput');
-            const cmd = input.value.trim();
-            if(!cmd) return;
+        // 봇 실행 / 중지
+        async function startCurrentBot() {
             const logBox = document.getElementById('logBox');
-            logBox.innerHTML += `<br>$ ${cmd}<br>`;
-            const response = await fetch('/run_command', {
+            logBox.innerHTML = `[!] 슬롯 구동 요청 중...<br>`;
+            const res = await fetch('/start_bot', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command: cmd })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ slot_id: currentSlotId })
             });
-            input.value = '';
-            if (eventSource) eventSource.close();
-            eventSource = new EventSource(`/stream_logs/terminal_console`);
-            eventSource.onmessage = function(event) {
-                logBox.innerHTML += event.data + "<br>";
-                logBox.scrollTop = logBox.scrollHeight;
-            };
+            const data = await res.json();
+            logBox.innerHTML += data.message + "<br>";
+            slots[currentSlotId].status = 'online';
+            updateSlotUI();
+        }
+
+        async function stopCurrentBot() {
+            await fetch('/stop_bot', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ slot_id: currentSlotId })
+            });
+            slots[currentSlotId].status = 'offline';
+            updateSlotUI();
+            document.getElementById('logBox').innerHTML += `<br>[!] 봇이 중지되었습니다.<br>`;
         }
 
         window.onload = function() {
-            loadFiles();
-            loadLibraries();
+            fetchSlots();
         };
     </script>
 </body>
