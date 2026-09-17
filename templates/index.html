@@ -14,7 +14,6 @@
             --accent-red: #ef4444;
             --accent-blue: #3b82f6;
             --accent-orange: #f59e0b;
-            --accent-purple: #8b5cf6;
         }
 
         body { 
@@ -24,7 +23,6 @@
             margin: 0; padding: 0;
         }
 
-        /* 상단 네비게이션 탭 바 */
         .top-nav {
             background: #090d16;
             border-bottom: 1px solid var(--panel-border);
@@ -35,38 +33,21 @@
         }
         .nav-tabs { display: flex; gap: 5px; overflow-x: auto; }
         .tab-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            padding: 15px 16px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
+            background: transparent; border: none; color: var(--text-muted);
+            padding: 15px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+            border-bottom: 2px solid transparent; transition: all 0.2s;
         }
         .tab-btn:hover { color: var(--text-main); }
         .tab-btn.active { color: var(--text-main); border-bottom-color: var(--text-main); }
 
         .slot-selector-container { display: flex; align-items: center; gap: 10px; }
         .slot-dropdown {
-            background: #1e293b;
-            color: #fff;
-            border: 1px solid var(--panel-border);
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            outline: none;
+            background: #1e293b; color: #fff; border: 1px solid var(--panel-border);
+            padding: 6px 12px; border-radius: 6px; font-size: 13px; outline: none;
         }
         .btn-add-slot {
-            background: var(--accent-orange);
-            color: #fff;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 13px;
+            background: var(--accent-orange); color: #fff; border: none;
+            padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;
         }
 
         .main-content { max-width: 1000px; margin: 25px auto; padding: 0 20px; }
@@ -74,59 +55,35 @@
         .tab-content.active { display: block; }
 
         .container {
-            background: var(--panel-bg);
-            padding: 25px;
-            border-radius: 12px;
-            border: 1px solid var(--panel-border);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            background: var(--panel-bg); padding: 25px; border-radius: 12px;
+            border: 1px solid var(--panel-border); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
             margin-bottom: 20px;
         }
 
         h2 { font-size: 1.2rem; margin-top: 0; border-bottom: 1px solid var(--panel-border); padding-bottom: 12px; display: flex; align-items: center; gap: 8px; }
         
-        /* 제어 패널 UI */
         .status-bar {
-            background: #090d16;
-            border: 1px solid var(--panel-border);
-            padding: 15px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            font-size: 13px;
+            background: #090d16; border: 1px solid var(--panel-border); padding: 15px;
+            border-radius: 8px; display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; font-size: 13px;
         }
         .badge { padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; display: inline-block; }
         .badge.online { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.4); }
         .badge.offline { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.4); }
 
         .control-btns button {
-            padding: 8px 14px;
-            font-weight: 600;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-right: 5px;
-            font-size: 13px;
+            padding: 8px 14px; font-weight: 600; border: none; border-radius: 6px;
+            cursor: pointer; margin-right: 5px; font-size: 13px;
         }
         .btn-start-bot { background: var(--accent-green); color: white; }
         .btn-stop-bot { background: var(--accent-red); color: white; }
 
         #logBox {
-            background: #05080f;
-            border: 1px solid var(--panel-border);
-            border-radius: 8px;
-            padding: 15px;
-            height: 320px;
-            overflow-y: auto;
-            font-family: 'Consolas', monospace;
-            font-size: 12.5px;
-            color: #34d399;
-            line-height: 1.5;
-            margin-bottom: 15px;
+            background: #05080f; border: 1px solid var(--panel-border); border-radius: 8px;
+            padding: 15px; height: 320px; overflow-y: auto; font-family: 'Consolas', monospace;
+            font-size: 12.5px; color: #34d399; line-height: 1.5; margin-bottom: 15px;
         }
 
-        /* 파일 관리 UI */
         .file-toolbar { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         .btn-action { padding: 8px 14px; border-radius: 6px; border: none; font-weight: 600; font-size: 13px; cursor: pointer; color: white; }
         .btn-upload { background: #14b8a6; }
@@ -139,61 +96,40 @@
         .file-row:hover { background: rgba(255,255,255,0.02); }
         .file-actions button { background: transparent; border: none; cursor: pointer; font-size: 14px; margin-right: 8px; }
 
-        /* 간편 설정 및 시작 설정 카드 */
         .setting-card {
-            background: #090d16;
-            border: 1px solid var(--panel-border);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
+            background: #090d16; border: 1px solid var(--panel-border); border-radius: 8px; padding: 20px; margin-bottom: 15px;
         }
-        .setting-card label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
-        .setting-card input, .setting-card select {
-            width: 100%;
-            padding: 10px;
-            background: #1e293b;
-            color: #fff;
-            border: 1px solid var(--panel-border);
-            border-radius: 6px;
-            font-size: 14px;
-            box-sizing: border-box;
-            outline: none;
-            margin-bottom: 10px;
-        }
-        
-        /* 라이브러리 빠른 추가 버튼 스타일 */
-        .lib-quick-add {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-        }
-        .lib-chip {
-            background: #1e293b;
-            border: 1px solid var(--panel-border);
-            color: var(--text-main);
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .lib-chip:hover {
-            background: var(--accent-blue);
-            border-color: var(--accent-blue);
+        .setting-card label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        .setting-card select {
+            width: 100%; padding: 10px; background: #1e293b; color: #fff;
+            border: 1px solid var(--panel-border); border-radius: 6px; font-size: 14px; outline: none; margin-bottom: 10px;
         }
 
-        .setting-card button.save-btn {
-            background: var(--accent-blue);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
+        .lib-input-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
+        .lib-input-row { display: flex; gap: 8px; align-items: center; }
+        .lib-input-row input {
+            flex: 1; padding: 9px 12px; background: #1e293b; color: #fff;
+            border: 1px solid var(--panel-border); border-radius: 6px; font-size: 13.5px; outline: none;
         }
+        .btn-remove-lib {
+            background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.4);
+            padding: 9px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;
+        }
+        .btn-remove-lib:hover { background: rgba(239, 68, 68, 0.4); }
 
-        /* 에디터 모달 */
+        .lib-control-bar { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-add-lib-field {
+            background: #334155; color: white; border: none; padding: 8px 14px;
+            border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+        }
+        .btn-add-lib-field:hover { background: #475569; }
+
+        .save-btn {
+            background: var(--accent-blue); color: white; border: none;
+            padding: 9px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13.5px;
+        }
+        .save-btn:hover { opacity: 0.9; }
+
         #editorModal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px);
@@ -214,7 +150,6 @@
 </head>
 <body>
 
-    <!-- 상단 네비게이션 탭 및 슬롯 선택 바 -->
     <div class="top-nav">
         <div class="nav-tabs">
             <button class="tab-btn active" onclick="switchTab('console')">콘솔</button>
@@ -229,8 +164,6 @@
     </div>
 
     <div class="main-content">
-
-        <!-- 1. 콘솔 탭 -->
         <div id="tab-console" class="tab-content active">
             <div class="container">
                 <h2>📡 봇 콘솔 및 실시간 로그</h2>
@@ -249,27 +182,20 @@
             </div>
         </div>
 
-        <!-- 2. 간편 설정 탭 (라이브러리 및 패키지 설정) -->
         <div id="tab-quick-setting" class="tab-content">
             <div class="container">
-                <h2>⚙️ 간편 설정 (Python 패키지)</h2>
+                <h2>⚙️ 간편 설정 (Python 패키지 관리)</h2>
                 <div class="setting-card">
-                    <label>PYTHON PACKAGES (pip로 설치할 패키지)</label>
-                    <div class="lib-quick-add">
-                        <span style="font-size:12px; color:var(--text-muted); align-self:center; margin-right:4px;">빠른 추가:</span>
-                        <button class="lib-chip" onclick="addLibraryToInput('discord.py')">+ discord.py</button>
-                        <button class="lib-chip" onclick="addLibraryToInput('python-dotenv')">+ python-dotenv</button>
-                        <button class="lib-chip" onclick="addLibraryToInput('requests')">+ requests</button>
-                        <button class="lib-chip" onclick="addLibraryToInput('aiohttp')">+ aiohttp</button>
-                        <button class="lib-chip" onclick="addLibraryToInput('beautifulsoup4')">+ beautifulsoup4</button>
+                    <label>PYTHON PACKAGES (설치할 라이브러리 목록)</label>
+                    <div id="libInputContainer" class="lib-input-container"></div>
+                    <div class="lib-control-bar">
+                        <button class="btn-add-lib-field" onclick="addLibInputField('')">+ 라이브러리 추가</button>
                     </div>
-                    <input type="text" id="quickPackagesInput" placeholder="예: discord.py python-dotenv aiohttp">
-                    <button class="save-btn" onclick="saveQuickPackages()">설정 저장</button>
+                    <button class="save-btn" onclick="saveQuickPackages()">설정 저장 및 라이브러리 설치</button>
                 </div>
             </div>
         </div>
 
-        <!-- 3. 파일 관리 탭 (추가, 수정, 삭제) -->
         <div id="tab-file" class="tab-content">
             <div class="container">
                 <h2>📂 파일 관리 (생성, 수정, 삭제)</h2>
@@ -293,7 +219,6 @@
             </div>
         </div>
 
-        <!-- 4. 시작 설정 탭 (구동할 메인 파일 지정) -->
         <div id="tab-start-setting" class="tab-content">
             <div class="container">
                 <h2>🚀 시작 파일 설정</h2>
@@ -304,10 +229,8 @@
                 </div>
             </div>
         </div>
-
     </div>
 
-    <!-- 파일 코드 편집 모달 -->
     <div id="editorModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -328,7 +251,6 @@
         let eventSource = null;
         let currentEditingFile = "";
 
-        // 탭 전환
         function switchTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -338,7 +260,6 @@
             if(tabName === 'start-setting') loadStartupFileOptions();
         }
 
-        // 슬롯 로드 및 UI 갱신
         async function fetchSlots() {
             const res = await fetch('/get_slots');
             const data = await res.json();
@@ -379,9 +300,9 @@
             const badge = document.getElementById('slotStatusBadge');
             badge.className = `badge ${slot.status}`;
             badge.textContent = slot.status === 'online' ? '온라인 (실행 중)' : '오프라인';
-            document.getElementById('quickPackagesInput').value = slot.packages || '';
             
-            // 로그 스트림 재연결
+            renderLibraryInputs(slot.packages || '');
+            
             if(eventSource) eventSource.close();
             eventSource = new EventSource(`/stream_logs/${currentSlotId}`);
             eventSource.onmessage = function(e) {
@@ -389,6 +310,29 @@
                 logBox.innerHTML += e.data + "<br>";
                 logBox.scrollTop = logBox.scrollHeight;
             };
+        }
+
+        function renderLibraryInputs(packagesStr) {
+            const container = document.getElementById('libInputContainer');
+            container.innerHTML = '';
+            let libs = packagesStr.trim() ? packagesStr.trim().split(/\s+/) : [];
+            
+            if(libs.length === 0) {
+                addLibInputField('');
+            } else {
+                libs.forEach(lib => addLibInputField(lib));
+            }
+        }
+
+        function addLibInputField(value) {
+            const container = document.getElementById('libInputContainer');
+            const row = document.createElement('div');
+            row.className = 'lib-input-row';
+            row.innerHTML = `
+                <input type="text" class="lib-name-input" placeholder="예: discord.py" value="${value}">
+                <button class="btn-remove-lib" onclick="this.parentElement.remove()">삭제</button>
+            `;
+            container.appendChild(row);
         }
 
         async function addNewSlot() {
@@ -399,25 +343,24 @@
             fetchSlots();
         }
 
-        // 라이브러리 빠른 추가 버튼 클릭 시 입력창에 자동 병합
-        function addLibraryToInput(libName) {
-            const input = document.getElementById('quickPackagesInput');
-            let currentVal = input.value.trim();
-            if(!currentVal) {
-                input.value = libName;
-            } else {
-                let libs = currentVal.split(/\s+/);
-                if(!libs.includes(libName)) {
-                    input.value = currentVal + " " + libName;
-                }
-            }
-        }
-
-        // 간편 설정 저장
         async function saveQuickPackages() {
-            slots[currentSlotId].packages = document.getElementById('quickPackagesInput').value;
+            const inputs = document.querySelectorAll('.lib-name-input');
+            let libs = [];
+            inputs.forEach(input => {
+                let val = input.value.trim();
+                if(val) libs.push(val);
+            });
+
+            slots[currentSlotId].packages = libs.join(' ');
             await saveSlotsToServer();
-            alert("패키지 설정이 저장되었습니다.");
+            
+            const res = await fetch('/install_packages', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ slot_id: currentSlotId, packages: slots[currentSlotId].packages })
+            });
+            const data = await res.json();
+            alert(data.message);
         }
 
         async function saveSlotsToServer() {
@@ -428,7 +371,6 @@
             });
         }
 
-        // 파일 목록 및 관리
         async function loadFilesList() {
             const res = await fetch('/get_files');
             const data = await res.json();
@@ -486,7 +428,6 @@
             loadFilesList();
         }
 
-        // 파일 편집 모달
         async function openEditor(filename) {
             currentEditingFile = filename;
             document.getElementById('modalTitle').textContent = `코드 편집: ${filename}`;
@@ -514,7 +455,6 @@
             alert(data.message);
         }
 
-        // 단축키 Ctrl + S 저장 지원
         document.addEventListener('keydown', e => {
             if((e.ctrlKey || e.metaKey) && e.key === 's') {
                 if(document.getElementById('editorModal').style.display === 'flex') {
@@ -524,7 +464,6 @@
             }
         });
 
-        // 시작 설정
         async function loadStartupFileOptions() {
             const res = await fetch('/get_files');
             const data = await res.json();
@@ -548,7 +487,6 @@
             alert("시작 파일 설정이 저장되었습니다.");
         }
 
-        // 봇 실행 / 중지
         async function startCurrentBot() {
             const logBox = document.getElementById('logBox');
             logBox.innerHTML = `[!] 슬롯 구동 요청 중...<br>`;
