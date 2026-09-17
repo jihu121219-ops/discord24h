@@ -156,28 +156,56 @@ def start_bot():
     if not os.path.exists(startup_file):
         return jsonify({"status": "error", "message": f"실행할 파일({startup_file})이 존재하지 않습니다."})
 
+    # [추가됨] 슬롯에 설정된 패키지 목록 가져오기
+    packages = slots[slot_id].get("packages", "").strip()
+
     q = Queue()
     bot_queues[slot_id] = q
 
-    def enqueue_output(out, queue):
-        for line in iter(out.readline, b''):
-            queue.put(line.decode('utf-8', errors='ignore'))
-        out.close()
+    def run_bot_pipeline():
+        # 1. 시작 버튼을 누르면 패키지를 먼저 자동으로 설치
+        if packages:
+            q.put(f"[!] 필수 패키지 설치 시도 중: {packages}...\n")
+            pkg_list = packages.split()
+            try:
+                install_cmd = [sys.executable, "-m", "pip", "install"] + pkg_list
+                result = subprocess.run(install_cmd, capture_output=True, text=True, check=True)
+                if result.stdout:
+                    for line in result.stdout.splitlines():
+                        q.put(line + "\n")
+                q.put("[!] 패키지 설치 완료!\n")
+            except subprocess.CalledProcessError as e:
+                q.put(f"[오류] 패키지 설치 실패:\n{e.stderr}\n")
+                return
+        else:
+            q.put("[!] 설치할 패키지가 지정되지 않았습니다.\n")
 
-    process = subprocess.Popen(
-        [sys.executable, startup_file],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        bufsize=1,
-        universal_newlines=False
-    )
-    bot_processes[slot_id] = process
+        # 2. 패키지 설치가 끝나면 파이썬 파일(.py) 실행
+        q.put(f"[!] '{startup_file}' 구동 시작...\n")
 
-    t = threading.Thread(target=enqueue_output, args=(process.stdout, q))
-    t.daemon = True
-    t.start()
+        def enqueue_output(out, queue):
+            for line in iter(out.readline, b''):
+                queue.put(line.decode('utf-8', errors='ignore'))
+            out.close()
 
-    return jsonify({"status": "success", "message": f"'{startup_file}' 구동이 시작되었습니다."})
+        process = subprocess.Popen(
+            [sys.executable, startup_file],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=1,
+            universal_newlines=False
+        )
+        bot_processes[slot_id] = process
+        bot_exit_notified.pop(slot_id, None)
+
+        t = threading.Thread(target=enqueue_output, args=(process.stdout, q))
+        t.daemon = True
+        t.start()
+
+    # 백그라운드 스레드에서 패키지 설치 후 봇 실행 진행
+    threading.Thread(target=run_bot_pipeline, daemon=True).start()
+
+    return jsonify({"status": "success", "message": f"'{startup_file}' 구동 파이프라인이 시작되었습니다."})
 
 @app.route('/stop_bot', methods=['POST'])
 def stop_bot():
