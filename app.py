@@ -1,40 +1,41 @@
-from flask import Flask, render_template, request, jsonify, Response
-import subprocess
 import os
-import threading
-import queue
 import sys
 import json
+import subprocess
+import threading
+from queue import Queue, Empty
+from flask import Flask, render_template, request, jsonify, Response
 
 app = Flask(__name__)
 
-SLOTS_FILE = "slots_data.json"
+# 슬롯 데이터 저장 파일 경로
+CONFIG_FILE = "slots_config.json"
 
-# 기본 슬롯 구조 초기화
-def load_slots():
-    if os.path.exists(SLOTS_FILE):
-        try:
-            with open(SLOTS_FILE, "r", encoding="utf-8") as f:
+# 전역 슬롯 상태 관리 딕셔너리 및 프로세스 관리
+# 구조: { slot_id: { "name": "...", "packages": "...", "startup_file": "...", "status": "offline" } }
+bot_processes = {}
+bot_queues = {}
+
+def load_slots_data():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            try:
                 return json.load(f)
-        except:
-            pass
-    # 기본 1개 슬롯
+            except:
+                pass
+    # 기본 초기 슬롯 설정
     return {
         "slot_1": {
             "name": "서버관리봇",
-            "startup_file": "app.py",
-            "packages": "discord.py python-dotenv",
+            "packages": "discord.py",
+            "startup_file": "bot.py",
             "status": "offline"
         }
     }
 
-def save_slots_data(data):
-    with open(SLOTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
-slots_data = load_slots()
-running_bots = {}  # slot_id: process
-bot_logs = {}      # slot_id: queue.Queue()
+def save_slots_data(slots):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(slots, f, ensure_ascii=False, indent=4)
 
 @app.route('/')
 def index():
@@ -42,219 +43,174 @@ def index():
 
 @app.route('/get_slots', methods=['GET'])
 def get_slots():
-    return jsonify({"status": "success", "slots": slots_data})
-
-@app.route('/save_slots', methods=['POST'])
-def save_slots():
-    global slots_data
-    data = request.json
-    slots_data = data.get('slots', {})
-    save_slots_data(slots_data)
-    return jsonify({"status": "success", "message": "슬롯 설정이 저장되었습니다."})
+    slots = load_slots_data()
+    # 현재 실행 상태 확인 후 동기화
+    for slot_id in slots:
+        if slot_id in bot_processes and bot_processes[slot_id].poll() is None:
+            slots[slot_id]["status"] = "online"
+        else:
+            slots[slot_id]["status"] = "offline"
+    return jsonify({"slots": slots})
 
 @app.route('/add_slot', methods=['POST'])
 def add_slot():
-    global slots_data
-    slot_id = f"slot_{len(slots_data) + 1}_" + os.urandom(2).hex()
-    slots_data[slot_id] = {
-        "name": f"새 봇 슬롯 {len(slots_data) + 1}",
-        "startup_file": "",
-        "packages": "discord.py",
+    slots = load_slots_data()
+    new_id = f"slot_{len(slots) + 1}"
+    slots[new_id] = {
+        "name": f"봇 슬롯 {len(slots) + 1}",
+        "packages": "",
+        "startup_file": "bot.py",
         "status": "offline"
     }
-    save_slots_data(slots_data)
-    return jsonify({"status": "success", "slots": slots_data})
+    save_slots_data(slots)
+    return jsonify({"slots": slots})
 
-@app.route('/delete_slot', methods=['POST'])
-def delete_slot():
-    global slots_data
+@app.route('/save_slots', methods=['POST'])
+def save_slots():
     data = request.json
-    slot_id = data.get('slot_id')
-    if slot_id in running_bots:
-        try:
-            running_bots[slot_id].terminate()
-            del running_bots[slot_id]
-        except:
-            pass
-    if slot_id in slots_data:
-        del slots_data[slot_id]
-        save_slots_data(slots_data)
-    return jsonify({"status": "success", "slots": slots_data})
+    slots = data.get("slots", {})
+    save_slots_data(slots)
+    return jsonify({"status": "success", "message": "저장되었습니다."})
+
+# [추가됨] 웹 화면에서 입력한 패키지를 즉시 pip로 설치하는 라우트
+@app.route('/install_packages', methods=['POST'])
+def install_packages():
+    data = request.json
+    packages = data.get('packages', '')
+    
+    if not packages.strip():
+        return jsonify({"status": "success", "message": "저장되었습니다. (설치할 패키지 없음)"})
+    
+    pkg_list = packages.split()
+    try:
+        cmd = [sys.executable, "-m", "pip", "install"] + pkg_list
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return jsonify({"status": "success", "message": f"라이브러리 설치 성공:\n{result.stdout}"})
+    except subprocess.CalledProcessError as e:
+        return jsonify({"status": "error", "message": f"라이브러리 설치 중 오류 발생:\n{e.stderr}"})
 
 @app.route('/get_files', methods=['GET'])
 def get_files():
-    try:
-        ignore_list = ['.cache', '.local', 'slots_data.json', 'app.py']
-        files = [f for f in os.listdir('.') if f not in ignore_list and not f.startswith('.')]
-        return jsonify({"status": "success", "files": files})
-    except Exception as e:
-        return jsonify({"status": "error", "files": [], "message": str(e)})
+    # 현재 디렉토리 내의 파일 목록 반환 (특정 확장자 제외 가능)
+    ignore_files = ['app.py', 'slots_config.json']
+    files = [f for f in os.listdir('.') if os.path.isfile(f) and f not in ignore_files and not f.startswith('.')]
+    return jsonify({"files": files})
 
 @app.route('/create_file', methods=['POST'])
 def create_file():
-    data = request.json
-    filename = data.get('filename', '').strip()
+    filename = request.json.get('filename')
     if not filename:
-        return jsonify({"status": "error", "message": "파일 이름을 입력해주세요."})
+        return jsonify({"status": "error", "message": "파일명이 없습니다."})
     if os.path.exists(filename):
-        return jsonify({"status": "error", "message": "이미 존재하는 파일 이름입니다."})
-    try:
-        with open(filename, "w", encoding="utf-8") as f:
-            f.write("")
-        return jsonify({"status": "success", "message": f"'{filename}' 파일이 생성되었습니다."})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+        return jsonify({"status": "error", "message": "이미 존재하는 파일입니다."})
+    
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write("# 여기에 코드를 작성하세요\n")
+    return jsonify({"status": "success", "message": f"'{filename}' 파일이 생성되었습니다."})
 
 @app.route('/delete_file', methods=['POST'])
 def delete_file():
-    data = request.json
-    filename = data.get('filename', '').strip()
-    if not filename or not os.path.exists(filename):
-        return jsonify({"status": "error", "message": "삭제할 파일을 찾을 수 없습니다."})
-    try:
+    filename = request.json.get('filename')
+    if filename and os.path.exists(filename):
         os.remove(filename)
         return jsonify({"status": "success", "message": f"'{filename}' 파일이 삭제되었습니다."})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+    return jsonify({"status": "error", "message": "파일을 찾을 수 없습니다."})
 
 @app.route('/upload_file', methods=['POST'])
 def upload_file():
-    if 'files' not in request.files:
-        return jsonify({"status": "error", "message": "업로드된 파일이 없습니다."})
-    files = request.files.getlist('files')
-    uploaded_count = 0
-    try:
-        for file in files:
-            if file and file.filename:
-                filename = file.filename
-                file.save(os.path.join('.', filename))
-                uploaded_count += 1
-        return jsonify({"status": "success", "message": f"{uploaded_count}개의 파일이 업로드되었습니다."})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+    uploaded_files = request.files.getlist("files")
+    for file in uploaded_files:
+        if file.filename:
+            file.save(file.filename)
+    return jsonify({"status": "success", "message": "파일 업로드 완료!"})
 
 @app.route('/read_file', methods=['GET'])
 def read_file():
-    filename = request.args.get('filename', '')
-    if not filename or not os.path.exists(filename):
-        return jsonify({"status": "error", "message": "파일을 찾을 수 없습니다."})
-    try:
-        with open(filename, "r", encoding="utf-8") as f:
+    filename = request.args.get('filename')
+    if filename and os.path.exists(filename):
+        with open(filename, 'r', encoding='utf-8') as f:
             content = f.read()
         return jsonify({"status": "success", "content": content})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+    return jsonify({"status": "error", "message": "파일을 읽을 수 없습니다."})
 
 @app.route('/save_file', methods=['POST'])
 def save_file():
     data = request.json
-    filename = data.get('filename', '')
-    content = data.get('content', '')
-    if not filename:
-        return jsonify({"status": "error", "message": "파일 이름이 없습니다."})
-    try:
-        with open(filename, "w", encoding="utf-8") as f:
+    filename = data.get('filename')
+    content = data.get('content')
+    if filename:
+        with open(filename, 'w', encoding='utf-8') as f:
             f.write(content)
-        return jsonify({"status": "success", "message": f"'{filename}' 저장 완료!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
-
-def read_output(process, slot_id):
-    while True:
-        output = process.stdout.readline()
-        if output == '' and process.poll() is not None:
-            break
-        if output:
-            log_line = output.strip()
-            if slot_id in bot_logs:
-                bot_logs[slot_id].put(log_line)
+        return jsonify({"status": "success", "message": "저장되었습니다."})
+    return jsonify({"status": "error", "message": "저장 실패"})
 
 @app.route('/start_bot', methods=['POST'])
 def start_bot():
     data = request.json
     slot_id = data.get('slot_id')
+    slots = load_slots_data()
     
-    if slot_id not in slots_data:
+    if slot_id not in slots:
         return jsonify({"status": "error", "message": "존재하지 않는 슬롯입니다."})
     
-    slot = slots_data[slot_id]
-    filename = slot.get('startup_file', '').strip()
-    packages = slot.get('packages', '').strip()
+    # 이미 실행 중인 경우 중지 후 재시작
+    if slot_id in bot_processes and bot_processes[slot_id].poll() is None:
+        bot_processes[slot_id].terminate()
 
-    if not filename or not filename.endswith('.py'):
-        return jsonify({"status": "error", "message": "시작 설정에서 올바른 .py 파일을 지정해주세요."})
-    if not os.path.exists(filename):
-        return jsonify({"status": "error", "message": f"지정된 파일({filename})이 존재하지 않습니다."})
-        
-    if slot_id in running_bots:
-        try:
-            running_bots[slot_id].terminate()
-        except:
-            pass
+    startup_file = slots[slot_id].get("startup_file", "bot.py")
+    if not os.path.exists(startup_file):
+        return jsonify({"status": "error", "message": f"실행할 파일({startup_file})이 존재하지 않습니다."})
 
-    if slot_id not in bot_logs:
-        bot_logs[slot_id] = queue.Queue()
+    q = Queue()
+    bot_queues[slot_id] = q
 
-    def run_with_install():
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
+    def enqueue_output(out, queue):
+        for line in iter(out.readline, b''):
+            queue.put(line.decode('utf-8', errors='ignore'))
+        out.close()
 
-        if packages:
-            bot_logs[slot_id].put(f"[*] 패키지 설치 중: {packages}")
-            try:
-                pkg_list = packages.split()
-                install_proc = subprocess.run(
-                    [sys.executable, "-m", "pip", "install"] + pkg_list,
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', env=env
-                )
-                for line in install_proc.stdout.splitlines():
-                    bot_logs[slot_id].put(line)
-                bot_logs[slot_id].put("[+] 패키지 설치 완료! 봇을 실행합니다.\n" + "="*40)
-            except Exception as e:
-                bot_logs[slot_id].put(f"[-] 패키지 설치 오류: {e}")
+    # 프로세스 실행
+    process = subprocess.Popen(
+        [sys.executable, startup_file],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+        universal_newlines=False
+    )
+    bot_processes[slot_id] = process
 
-        process = subprocess.Popen(
-            [sys.executable, '-u', filename],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding='utf-8',
-            env=env
-        )
-        running_bots[slot_id] = process
-        slots_data[slot_id]['status'] = 'online'
-        threading.Thread(target=read_output, args=(process, slot_id), daemon=True).start()
+    t = threading.Thread(target=enqueue_output, args=(process.stdout, q))
+    t.daemon = True
+    t.start()
 
-    threading.Thread(target=run_with_install, daemon=True).start()
-    return jsonify({"status": "success", "message": f"[{slot['name']}] '{filename}' 구동 시작..."})
+    return jsonify({"status": "success", "message": f"'{startup_file}' 구동이 시작되었습니다."})
 
 @app.route('/stop_bot', methods=['POST'])
 def stop_bot():
     data = request.json
     slot_id = data.get('slot_id')
-    if slot_id in running_bots:
-        try:
-            running_bots[slot_id].terminate()
-            del running_bots[slot_id]
-            slots_data[slot_id]['status'] = 'offline'
-            return jsonify({"status": "success", "message": "봇이 중지되었습니다."})
-        except Exception as e:
-            return jsonify({"status": "error", "message": str(e)})
-    slots_data[slot_id]['status'] = 'offline'
-    return jsonify({"status": "success", "message": "실행 중이 아니거나 이미 중지되었습니다."})
+    if slot_id in bot_processes and bot_processes[slot_id].poll() is None:
+        bot_processes[slot_id].terminate()
+        return jsonify({"status": "success", "message": "봇이 중지되었습니다."})
+    return jsonify({"status": "error", "message": "실행 중인 봇이 아닙니다."})
 
 @app.route('/stream_logs/<slot_id>')
 def stream_logs(slot_id):
-    def generate():
-        if slot_id not in bot_logs:
-            bot_logs[slot_id] = queue.Queue()
+    def event_stream():
+        q = bot_queues.get(slot_id)
+        if not q:
+            yield f"data: [!] 로그 스트림 대기 중...\n\n"
+            return
         while True:
             try:
-                line = bot_logs[slot_id].get(timeout=1)
-                yield f"data: {line}\n\n"
-            except queue.Empty:
+                line = q.get(timeout=1.0)
+                yield f"data: {line.strip()}\n\n"
+            except Empty:
+                if slot_id in bot_processes and bot_processes[slot_id].poll() is not None:
+                    yield f"data: [!] 프로세스가 종료되었습니다.\n\n"
+                    break
                 continue
-    return Response(generate(), mimetype='text/event-stream')
+    return Response(event_stream(), mimetype="text/event-stream")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
